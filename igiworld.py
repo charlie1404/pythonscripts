@@ -5,6 +5,7 @@ import urllib2
 import csv
 import re
 import time
+import traceback
 from bs4 import BeautifulSoup
 from difflib import SequenceMatcher
 
@@ -26,6 +27,7 @@ PARAM_1 = int(sys.argv[1])
 PARAM_2 = int(sys.argv[2])
 REPORT_NO_LIST = list(range(PARAM_1 , PARAM_2 + 1))
 REQ_FEILDS = ["report_no","shape_cut","carat_weight","color_grade","clarity_grade","polish","symmetry","table_size","total_depth","fluorescence", "width", "length", "depth", "measurement", "shape", "cut", "cut_grade"]
+LOG_FILENAME = "error.log"
 #CSV_FILENAME = "csv_" + time.strftime("%d-%m-%Y_%H-%M-%S") + ".csv"
 CSV_FILENAME = "test.csv"  ## development only
 
@@ -47,6 +49,20 @@ def populateRowsList(raw_rows):
         tmp.append( value )
         rows_list.append(tmp)
     return rows_list
+
+def reqListGenerater(dict_param):
+    tmp_list = []
+
+    for req in REQ_FEILDS :
+        tmp = dict_param[req]
+        if (tmp is not None):
+            if req == "carat_weight" :
+                tmp = tmp.replace('carat','').strip()
+            if (req == "table_size" or req == "total_depth"):
+                tmp = tmp.replace('%','').strip()
+
+        tmp_list.append(tmp)
+    return tmp_list
 
 ################### User Defined Functions ######################
 
@@ -73,13 +89,13 @@ for report_no in REPORT_NO_LIST :
         req_rows_dict = {
             'report_no': getValueFromDict( rows_dict ,'report number' ),
             'shape_cut': getValueFromDict( rows_dict , 'shape and cut' ),
-            'carat_weight': getValueFromDict( rows_dict , 'carat weight' ).replace('carat','').strip(),
+            'carat_weight': getValueFromDict( rows_dict , 'carat weight' ),
             'color_grade': getValueFromDict( rows_dict , 'color grade' ),
             'clarity_grade': getValueFromDict( rows_dict , 'clarity grade' ),
             'polish': getValueFromDict( rows_dict , 'polish' ),
             'symmetry': getValueFromDict( rows_dict , 'symmetry' ),
-            'table_size': getValueFromDict( rows_dict , 'table size' ).replace('%','').strip(),
-            'total_depth': getValueFromDict( rows_dict , 'total depth' ).replace('%','').strip(),
+            'table_size': getValueFromDict( rows_dict , 'table size' ),
+            'total_depth': getValueFromDict( rows_dict , 'total depth' ),
             'fluorescence': getValueFromDict( rows_dict , 'fluorescence' ),
             'width': measurements_list[0],
             'length': measurements_list[1],
@@ -90,20 +106,28 @@ for report_no in REPORT_NO_LIST :
             'measurement': getValueFromDict( rows_dict , 'measurements' )
         }
 
-        for req in REQ_FEILDS :
-            req_rows_list.append(req_rows_dict[req])
+        req_rows_list = reqListGenerater(req_rows_dict)
 
         csv_file_handler.writerow(req_rows_list)
         print str(report_no) + " Success"
-    except:
-        print str(report_no) + " Failure"
-        EX_FILE = str(replaceeport_no) + ".txt"
-        file_handler = open(EX_FILE,"w")
-        file_handler.write(table_data_soup)
-        file_handler.close()
+    except Exception as ex:
+        try:
+            EX_FILE = "ex/" + str(report_no) + ".html"
+            file_handler = open(EX_FILE,"w")
+            file_handler.write(str(table_data_soup))
+            file_handler.close()
+
+            print str(report_no) + " Failure With Exception"
+
+            file_handler = open(LOG_FILENAME,"w")
+            file_handler.write(str(report_no) + " :--\n" + str(ex) + "\n\n" + str(traceback.format_exc()) + \
+                "-----------------------------------------------------------------------------------\n\n\n\n\n")
+            file_handler.close()
+            print traceback.format_exc()
+        except:
+            print "Unknown Error on " + str(report_no)
 
 
 #################################################################
 
 # print SequenceMatcher(None, "shailendra".lower(), "Shailendra".lower()).ratio()
-
